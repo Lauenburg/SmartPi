@@ -1,4 +1,5 @@
 import paho.mqtt.client as mqtt
+import configparser
 import time
 
 
@@ -61,6 +62,13 @@ def mqtt_main(broker_address, port, topic, queue):
             queue: Message buffer for the asynchronous exchange 
 
     '''
+    # load the configuration data
+    # retrieve the x_limit to pause the broker when the plot 
+    # is not recording any more
+    config = configparser.ConfigParser()
+    config.read('settings.ini')
+    config_mqtt = config["mqtt_client"]
+    config_plot = config["plot"]
 
     # setup the topic and the call back functions
     mqtt_sub = MqttSubscriber(topic, queue)
@@ -71,6 +79,9 @@ def mqtt_main(broker_address, port, topic, queue):
     # start the loop
     mqtt_sub.loop_start()  
 
+    # save start time to know when to stop
+    start_time = time.time()
+    
     # Wait for connection
     while not mqtt_sub.connected:  
         time.sleep(0.1)
@@ -79,14 +90,14 @@ def mqtt_main(broker_address, port, topic, queue):
     try:
         while True:
             time.sleep(1)
-
+            if (float(time.time()) >= float(start_time) + float(config_plot["x_limit"])+float(5) 
+                and bool(config_mqtt["stop_broker_at_x_limit"])):
+                break
     except KeyboardInterrupt:
         print("exiting")
         mqtt_sub.disconnect()
 
     queue.put('DONE')
-
-
 
 
 if __name__ == '__main__':
