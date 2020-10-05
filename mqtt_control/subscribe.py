@@ -1,5 +1,5 @@
 import paho.mqtt.client as mqtt
-import configparser
+from pathlib import Path
 import time
 
 
@@ -42,16 +42,16 @@ class MqttSubscriber(mqtt.Client):
             Args:
                 Refer to standard paho-mqtt documentation 
         '''
-
         print("Message received for topic \"" + message.topic + "\" : " + message.payload.decode("utf-8"))
-        with open('/Users/lauenburg/Privat/CodeProjects/SmartPi/logs/' + str(message.topic.split('/')[-1]) + '.txt', 'a+') as f:
+        # write payload to log file and put it in to the queue
+        with open(save_log, 'a+') as f:
             f.write(message.payload.decode("utf-8") + "\n")
             #if message.topic.split('/')[-1] == 'P1' or message.topic.split('/')[-1] == 'F1' or message.topic.split('/')[-1] == 'I1':
             #    self.queue.put({message.topic.split('/')[-1]:message.payload.decode("utf-8")})
             self.queue.put(message.payload.decode("utf-8"))
 
 
-def mqtt_main(broker_address, port, topic, queue):
+def mqtt_main(broker_address, port, topic, queue, x_limit, stop_limit, dir_log, file_log):
     ''' Handles the connection to the broker as well as the 
         processing of the messages.
 
@@ -60,15 +60,18 @@ def mqtt_main(broker_address, port, topic, queue):
             port: Port of the broker
             topic: Topic to which to subscribe
             queue: Message buffer for the asynchronous exchange 
+            stop_limit: Boolean telling mqtt to stop when x_limit is reach.
+                        At x_limit the live plot stop plotting.
+            dir_log: Directory where the data logs are to be saved.
+            file_log: File name of the data log.
 
     '''
-    # load the configuration data
-    # retrieve the x_limit to pause the broker when the plot 
-    # is not recording any more
-    config = configparser.ConfigParser()
-    config.read('settings.ini')
-    config_mqtt = config["mqtt_client"]
-    config_plot = config["plot"]
+    # make the log file location excisable for the on_message call back function 
+    global save_log
+    # concatenate the log directory with the log file name
+    save_log = str(dir_log) +"/"+ str(file_log)
+    # ensure that the directory exists
+    Path(dir_log).mkdir(parents=True, exist_ok=True)
 
     # setup the topic and the call back functions
     mqtt_sub = MqttSubscriber(topic, queue)
@@ -82,16 +85,16 @@ def mqtt_main(broker_address, port, topic, queue):
     # save start time to know when to stop
     start_time = time.time()
     
-    # Wait for connection
+    # wait for connection
     while not mqtt_sub.connected:  
         time.sleep(0.1)
 
-    # run loop till keyboard interrupt
+    # run loop till keyboard interrupt or until x_limit is reached
     try:
         while True:
             time.sleep(1)
-            if (float(time.time()) >= float(start_time) + float(config_plot["x_limit"])+float(5) 
-                and bool(config_mqtt["stop_broker_at_x_limit"])):
+            if (float(time.time()) >= float(start_time)+float(x_limit)+float(5) 
+                and stop_limit):
                 break
     except KeyboardInterrupt:
         print("exiting")
@@ -101,8 +104,4 @@ def mqtt_main(broker_address, port, topic, queue):
 
 
 if __name__ == '__main__':
-    broker_address = "127.0.0.1"  # Broker address
-    port = 1883  # Broker port
-    topic = '#'
-    mqtt_main(broker_address,port,topic)
-
+    print("Nothing is done here. -> Run \'python master.py\'")
