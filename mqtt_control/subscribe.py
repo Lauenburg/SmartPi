@@ -1,5 +1,4 @@
 import paho.mqtt.client as mqtt
-import configparser
 import time
 
 
@@ -51,7 +50,7 @@ class MqttSubscriber(mqtt.Client):
             self.queue.put(message.payload.decode("utf-8"))
 
 
-def mqtt_main(broker_address, port, topic, queue):
+def mqtt_main(broker_address, port, topic, queue, x_limit, stop_limit):
     ''' Handles the connection to the broker as well as the 
         processing of the messages.
 
@@ -60,15 +59,10 @@ def mqtt_main(broker_address, port, topic, queue):
             port: Port of the broker
             topic: Topic to which to subscribe
             queue: Message buffer for the asynchronous exchange 
+            stop_limit: Boolean telling mqtt to stop when x_limit is reach.
+                        At x_limit the live plot stop plotting.
 
     '''
-    # load the configuration data
-    # retrieve the x_limit to pause the broker when the plot 
-    # is not recording any more
-    config = configparser.ConfigParser()
-    config.read('settings.ini')
-    config_mqtt = config["mqtt_client"]
-    config_plot = config["plot"]
 
     # setup the topic and the call back functions
     mqtt_sub = MqttSubscriber(topic, queue)
@@ -82,16 +76,16 @@ def mqtt_main(broker_address, port, topic, queue):
     # save start time to know when to stop
     start_time = time.time()
     
-    # Wait for connection
+    # wait for connection
     while not mqtt_sub.connected:  
         time.sleep(0.1)
 
-    # run loop till keyboard interrupt
+    # run loop till keyboard interrupt or until x_limit is reached
     try:
         while True:
             time.sleep(1)
-            if (float(time.time()) >= float(start_time) + float(config_plot["x_limit"])+float(5) 
-                and bool(config_mqtt["stop_broker_at_x_limit"])):
+            if (float(time.time()) >= float(start_time)+float(x_limit)+float(5) 
+                and stop_limit):
                 break
     except KeyboardInterrupt:
         print("exiting")
@@ -101,8 +95,4 @@ def mqtt_main(broker_address, port, topic, queue):
 
 
 if __name__ == '__main__':
-    broker_address = "127.0.0.1"  # Broker address
-    port = 1883  # Broker port
-    topic = '#'
-    mqtt_main(broker_address,port,topic)
-
+    print("Nothing is done here. -> Run \'python master.py\'")
