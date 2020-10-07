@@ -43,24 +43,31 @@ def subscribe_and_live_plot(
     subscriber.daemon = True
     subscriber.start()
 
-    # start the plot
-    live_plt(
-        queue,
-        title,
-        x_limit,
-        y_top_limit,
-        y_bottom_limit,
-        x_label,
-        y_label,
-        dir_fig,
-        file_fig,
+    live_plot = Process(
+        target=live_plt,
+        args=(
+            queue,
+            title,
+            x_limit,
+            y_top_limit,
+            y_bottom_limit,
+            x_label,
+            y_label,
+            dir_fig,
+            file_fig,
+        ),
     )
+
+    # start the plotting thread
+    live_plot.start()
 
     # Wait for the reader to finish
     subscriber.join()
-    # result_cubes = pool.apply_async(live_plt, config_logs["dir_log"])
+
+    # Wait for the plotter to finish
+    live_plot.join()
+
     time.sleep(1)
-    return 0
 
 
 if __name__ == "__main__":
